@@ -1,0 +1,291 @@
+//
+//  forest.cpp
+//  Forest
+//
+//  Created by Matteo Muraca
+//  Copyright © 2020 Matteo Muraca. All rights reserved.
+//
+//  Forest rules:
+//  1.  A burning tree turns into an empty cell.
+//  2.  A non-burning tree with one burning neighbour turns into a burning tree.
+//  3.  A tree ignites with probability 1/f due to lightning.
+//  4.  An empty space grows a new tree with probability 1/p.
+//
+//  A cell can be:
+//  1. Tree
+//  0. Ground
+// -1. Burning tree
+//
+
+
+#include <iostream>
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_primitives.h>
+#include <mpi.h>
+using namespace std;
+
+//Game settings
+const int GROUND = 0;
+const int TREE = 1;
+const int BURNING = -1;
+//matrix dimension
+const int dim = 300;
+//lightining probability
+const int l = 2000;
+//growth probability
+const int g = 200;
+//seed for random
+unsigned int seed;
+
+//Allegro settings
+const int width = 1500;
+const int height = 1500;
+ALLEGRO_DISPLAY * display;
+
+//parallel processing variables
+const int root = 0;
+int numOfProcesses;
+
+//fill vector with value
+void fillVector(int* vector, int dimension, int value) {
+    for(int i=0; i<dimension; i++)
+        vector[i] = value;
+}
+
+//copy one vector into another
+void copyVector(int* original, int* copy, int dimension) {
+    for(int i=0; i<dimension; i++)
+        copy[i] = original[i];
+}
+
+//2d array (matrix) contiguous allocation
+template <class T>
+T** matrixAllocation(int N, int M) {
+    T* tmp = (T*) malloc(sizeof(T)*N*M);
+    T** mat = (T**) malloc(sizeof(T*)*N);
+    for(int i = 0 ; i < N ; i++) {
+        mat[i] = &(tmp[M*i]);
+    }
+    return mat;
+}
+
+//2d array (matrix) delete
+template <class T>
+void deleteMatrix(T** mat) {
+    if(mat == nullptr)
+        return;
+    free(mat[0]);
+    free(mat);
+}
+
+//initialize the main matrix with non-burning cells (tree or ground)
+void initModel(int** cells) {
+    for (int i = 0; i < dim; ++i) {
+        for (int j = 0; j < dim; ++j) {
+            cells[i][j] = rand_r(&seed) % 2;
+        }
+    }
+}
+
+//draw the matrix
+void drawCells(int ** cells) {
+    al_clear_to_color(al_map_rgb(0,0,0));
+    
+    for (unsigned int i = 0; i < dim; i++) {
+        for (unsigned int j = 0; j < dim; j++) {
+            switch (cells[i][j]) {
+                case GROUND:
+                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
+                                             j * width/dim + width/dim,
+                                             i * height/dim + height/dim, al_map_rgb(73,32,0));
+                    break;
+                case TREE:
+                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
+                                             j * width/dim + width/dim,
+                                             i * height/dim + height/dim, al_map_rgb(0, 150, 0));
+                    
+                    break;
+                case BURNING:
+                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
+                                             j * width/dim + width/dim,
+                                             i * height/dim + height/dim, al_map_rgb(200, 0, 0));
+                    break;
+                default:
+                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
+                                             j * width/dim + width/dim,
+                                             i * height/dim + height/dim, al_map_rgb(255, 255, 255));
+                    break;
+            }
+            
+        }
+        
+    }
+    al_flip_display();
+    al_rest(0.5);
+}
+
+
+//if you press esc, the game will finish
+bool continueProcessing(int rank) {
+    int buf = 0;
+    if(rank==root) {
+        ALLEGRO_KEYBOARD_STATE key_state;
+        al_get_keyboard_state(&key_state);
+        if(!al_key_down(&key_state, ALLEGRO_KEY_ESCAPE)) //root will check if the key esc is pressed
+            buf = INT_MAX; //if so, this variable's value will become INT_MAX
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(&buf, 1, MPI_INT, 0, MPI_COMM_WORLD); //the variable will be broadcasted to all processors
+    return buf == INT_MAX; //if it's INT_MAX, the program will be stopped
+}
+
+int computeTree(int ** subMatrix, int x, int y, int * upperVector, int * lowerVector) {
+    
+    if(subMatrix[x][y]==GROUND){ //if the cell is ground, a tree can grow with p = 1/g
+        int randomN = rand_r(&seed) % g;
+        if(randomN==0)
+            return TREE;
+    }
+    else if(subMatrix[x][y]==TREE){
+        //if a tree next to the current one is burning, the tree will be burning
+        if(x>0){
+            if(subMatrix[x-1][y]==BURNING)
+                return BURNING;
+        }
+        else if(upperVector[y]==BURNING)
+            return BURNING;
+        
+        if(x<dim/numOfProcesses - 1){
+            if(subMatrix[x+1][y]==BURNING)
+                return BURNING;
+        }
+        else if(lowerVector[y]==BURNING){
+            return BURNING;
+        }
+        if(y>0){
+            if(subMatrix[x][y-1]==BURNING)
+                return BURNING;
+        }
+        if(y<dim-1){
+            if(subMatrix[x][y+1]==BURNING)
+                return BURNING;
+        }
+        int randomN = rand_r(&seed) % l; //if the tree is not already burning, it ignites with p = 1/l
+        if(randomN==0)
+            return BURNING;
+        
+        return TREE;
+    }
+    //if the cell was not a tree nor ground where a tree has grown
+    //it will still be ground, or become ground if there was a burning tree
+    return GROUND;
+}
+
+int main(int argc, char *argv[]) {
+    MPI_Init(&argc, &argv);
+    
+    int rank;
+    
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    
+    MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
+    
+    if(dim%numOfProcesses!=0 && rank==root) {
+        cout<<"Error: please use a divider of "<< dim <<" as number of processes."<<endl;
+        MPI_Abort(MPI_COMM_WORLD, -1);
+    }
+    
+    
+    seed = 31415 * (rank+1); //I liked π
+    
+    int ** cells = nullptr;
+    
+    if(rank==root) {
+        cells = matrixAllocation<int>(dim, dim);
+        initModel(cells);
+        
+        
+        al_init();
+        al_init_primitives_addon();
+        display = al_create_display(width, height);
+        al_install_keyboard();
+        drawCells(cells);
+    }
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    int ** subMatrix = matrixAllocation<int>(dim/numOfProcesses, dim);
+    int ** newSubMatrix = matrixAllocation<int>(dim/numOfProcesses, dim);
+    
+    int * upperVector = (int*) malloc(sizeof(int)*dim);
+    int * lowerVector = (int*) malloc(sizeof(int)*dim);
+    
+    while(continueProcessing(rank)) {
+            
+        if(rank==root) {
+            //split the matrix into submatrices, one for each processor
+            MPI_Scatter(&cells[0][0], dim*dim/numOfProcesses, MPI_INT, &subMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+
+            fillVector(upperVector, dim, 0); //upperVector for rank 0 is null, and also lowerVector for the highest rank
+            
+            if(numOfProcesses > 1)
+                copyVector(cells[(dim/numOfProcesses)], lowerVector, dim); //root's lowerVector is in that position of the matrix
+            else
+                copyVector(upperVector, lowerVector, dim); //root's lowerVector will be null
+            
+            MPI_Request r;
+                for(int j=1; j<numOfProcesses; j++) {
+                    
+                    //send the upper vector
+                    MPI_Isend(&cells[(j*dim/numOfProcesses) - 1][0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r);
+                    
+                    //send the lower vector
+                    if(j==numOfProcesses-1)
+                        MPI_Isend(&upperVector[0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r); //or null vector if it's the last processor
+                    else
+                        MPI_Isend(&cells[((j+1)*dim/numOfProcesses)][0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r);
+                }
+            
+        }
+        else {
+            //split the matrix into submatrices, one for each processor
+            MPI_Scatter(NULL, 0, NULL, &subMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+
+            MPI_Status s;
+            //recieve upperVector and lowerVector
+            MPI_Recv(&upperVector[0], dim, MPI_INT, root, rank, MPI_COMM_WORLD, &s);
+            MPI_Recv(&lowerVector[0], dim, MPI_INT, root, rank, MPI_COMM_WORLD, &s);
+        }
+        
+        MPI_Barrier(MPI_COMM_WORLD);
+        
+        for(int i=0; i<dim/numOfProcesses; i++) {
+            for(int j=0; j<dim; j++) {
+                //compute the new submatrix for each processor
+                newSubMatrix[i][j] = computeTree(subMatrix, i, j, upperVector, lowerVector);
+            }
+        }
+        
+        MPI_Barrier(MPI_COMM_WORLD);
+        
+        //the new matrix is stored into the root, overwriting the old one
+        if(rank==root)
+            MPI_Gather(&newSubMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+        else
+            MPI_Gather(&newSubMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, NULL, 0, MPI_INT, root, MPI_COMM_WORLD);
+        
+        if(rank==root)
+            drawCells(cells);
+    
+    }
+    
+    deleteMatrix(cells);
+    deleteMatrix(subMatrix);
+    deleteMatrix(newSubMatrix);
+    free(upperVector);
+    free(lowerVector);
+    
+    MPI_Finalize();
+    return 0;
+}
+

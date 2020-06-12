@@ -7,7 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		10F231D82479229B00A9019F /* forest.c in Sources */ = {isa = PBXBuildFile; fileRef = 10F231D72479229B00A9019F /* forest.c */; };
+		100C0AF62493C6950028FC29 /* serialForest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 100C0AF52493C6950028FC29 /* serialForest.cpp */; };
+		1031C5DF2488C84C0023BF69 /* forest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 1031C5DD2488C84C0023BF69 /* forest.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -23,8 +24,11 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		100C0AF52493C6950028FC29 /* serialForest.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = serialForest.cpp; sourceTree = "<group>"; };
+		1031C5DD2488C84C0023BF69 /* forest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = forest.cpp; sourceTree = "<group>"; };
 		1066F91324791F330076BAC6 /* Forest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Forest; sourceTree = BUILT_PRODUCTS_DIR; };
-		10F231D72479229B00A9019F /* forest.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = forest.c; sourceTree = "<group>"; };
+		10F231D9247924DA00A9019F /* LICENSE */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = LICENSE; sourceTree = "<group>"; };
+		10F231DA247924DA00A9019F /* README.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +45,8 @@
 		1066F90A24791F330076BAC6 = {
 			isa = PBXGroup;
 			children = (
+				10F231D9247924DA00A9019F /* LICENSE */,
+				10F231DA247924DA00A9019F /* README.md */,
 				1066F91524791F330076BAC6 /* Forest */,
 				1066F91424791F330076BAC6 /* Products */,
 			);
@@ -57,7 +63,8 @@
 		1066F91524791F330076BAC6 /* Forest */ = {
 			isa = PBXGroup;
 			children = (
-				10F231D72479229B00A9019F /* forest.c */,
+				1031C5DD2488C84C0023BF69 /* forest.cpp */,
+				100C0AF52493C6950028FC29 /* serialForest.cpp */,
 			);
 			path = Forest;
 			sourceTree = "<group>";
@@ -118,7 +125,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				10F231D82479229B00A9019F /* forest.c in Sources */,
+				100C0AF62493C6950028FC29 /* serialForest.cpp in Sources */,
+				1031C5DF2488C84C0023BF69 /* forest.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -239,28 +247,52 @@
 		1066F91B24791F330076BAC6 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
 				CODE_SIGN_STYLE = Automatic;
-				"HEADER_SEARCH_PATHS[arch=*]" = /usr/local/include;
-				"LIBRARY_SEARCH_PATHS[arch=*]" = /usr/local/lib;
+				GCC_C_LANGUAGE_STANDARD = "compiler-default";
+				GCC_VERSION = "";
+				"HEADER_SEARCH_PATHS[arch=*]" = (
+					/usr/local/include,
+					/users/dfox/opt/usr/local/include,
+				);
+				"LIBRARY_SEARCH_PATHS[arch=*]" = (
+					/users/dfox/opt/usr/local/lib,
+					/usr/local/lib,
+				);
 				"OTHER_LDFLAGS[arch=*]" = (
 					"-lallegro",
 					"-lallegro_main",
+					"-lallegro_primitives",
+					"-lmpi",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = YES;
 			};
 			name = Debug;
 		};
 		1066F91C24791F330076BAC6 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "compiler-default";
 				CODE_SIGN_STYLE = Automatic;
-				"HEADER_SEARCH_PATHS[arch=*]" = /usr/local/include;
-				"LIBRARY_SEARCH_PATHS[arch=*]" = /usr/local/lib;
+				GCC_C_LANGUAGE_STANDARD = "compiler-default";
+				GCC_VERSION = "";
+				"HEADER_SEARCH_PATHS[arch=*]" = (
+					/usr/local/include,
+					/users/dfox/opt/usr/local/include,
+				);
+				"LIBRARY_SEARCH_PATHS[arch=*]" = (
+					/usr/local/lib,
+					/users/dfox/opt/usr/local/lib,
+				);
 				"OTHER_LDFLAGS[arch=*]" = (
 					"-lallegro",
 					"-lallegro_main",
+					"-lallegro_primitives",
+					"-lmpi",
 				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SCAN_ALL_SOURCE_FILES_FOR_INCLUDES = YES;
 			};
 			name = Release;
 		};
