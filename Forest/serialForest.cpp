@@ -5,6 +5,8 @@
 //  Created by Matteo Muraca
 //  Copyright © 2020 Matteo Muraca. All rights reserved.
 //
+//  Forest - a green cellular automata
+//
 //  Forest rules:
 //  1.  A burning tree turns into an empty cell.
 //  2.  A non-burning tree with one burning neighbour turns into a burning tree.
