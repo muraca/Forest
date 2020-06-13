@@ -22,7 +22,7 @@
 //  0. Ground
 // -1. Burning tree
 //
-//  You should use a divider of dim as number of processes.
+//  You should use a multiple of 4 as dim.
 
 #include <iostream>
 #include <allegro5/allegro.h>
@@ -35,7 +35,7 @@ const int GROUND = 0;
 const int TREE = 1;
 const int BURNING = -1;
 //matrix dimension
-const int dim = 300;
+const int dim = 200;
 //lightining probability
 const int l = 2000;
 //growth probability
