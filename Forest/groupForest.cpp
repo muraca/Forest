@@ -9,7 +9,9 @@
 //  Which implements groups and group communicators
 //  Programmed in C++ using MPI libraries
 //
-//  Be careful: it only works with 4 processes!
+//  There are two automatas running in parallel
+//  You will tell the program how many and which processes
+//  Will be part of the first group
 //
 //  Forest rules:
 //  1.  A burning tree turns into an empty cell.
@@ -22,7 +24,7 @@
 //  0. Ground
 // -1. Burning tree
 //
-//  You should use a multiple of 4 as dim.
+//  You should use a divider of dim as number of processes for both the groups.
 
 #include <iostream>
 #include <allegro5/allegro.h>
@@ -190,23 +192,101 @@ int computeTree(int ** subMatrix, int x, int y, int * upperVector, int * lowerVe
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
     
-    int rank;
+    int worldRank;
     
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    
+    MPI_Comm_rank(MPI_COMM_WORLD, &worldRank);
     MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
     
-    if(dim%numOfProcesses!=0 && rank==root) {
-        cout<<"Error: please use a divider of "<< dim <<" as number of processes."<<endl;
-        MPI_Abort(MPI_COMM_WORLD, -1);
+
+    int np1; //number of processes for first automata
+    int* firstGroupArr = nullptr; //array which will contain the processes used in firstGroup
+    
+    if(worldRank==root) {
+        cout<<"Insert number of processes for first automata: ";
+        cin>>np1;
+        
+        if(np1>=numOfProcesses) { //the number is not valid
+            cout<<"Error: please use a number smaller than "<< numOfProcesses <<" as number of processes for first automata."<<endl;
+            MPI_Abort(MPI_COMM_WORLD, -2);
+        }
+        
+        if(dim%np1!=0 && dim%(numOfProcesses-np1)!=0) {
+            cout<<"Error: please use a divider of "<< dim <<" as number of processes."<<endl;
+            MPI_Abort(MPI_COMM_WORLD, -1);
+        }
+        
+        firstGroupArr = new int[np1];
+        for(int i=0; i<np1; i++) {
+            cout<<"Insert process "<<i<<" for the first automata: ";
+            int x;
+            cin>>x;
+            if(x<0) //I didn't want to use an unsigned int because numOfProcesses and rank are signed integers
+                x = -x;
+            //control if x represents a valid process and if it's not present in the group
+            bool xOk = true;
+            if(x < numOfProcesses)
+                for(int j = 0; j < i; j++)
+                    if(x==firstGroupArr[j])
+                        xOk = false;
+            
+            if(!xOk || x >= numOfProcesses) {
+                cout<<"Not valid! Try again!"<<endl;
+                i--;
+            }
+            else {
+                firstGroupArr[i] = x;
+            }
+            
+        }
     }
     
+    MPI_Bcast(&np1, 1, MPI_INT, root, MPI_COMM_WORLD); //broadcast to all the other processes the num of processes in the first group
     
-    seed = 31415 * (rank+1); //I liked π
+    if(worldRank != root)
+        firstGroupArr = new int[np1];
+    
+    MPI_Bcast(&firstGroupArr[0], np1, MPI_INT, root, MPI_COMM_WORLD); //broadcast to all the other processes the array of processes in the first group
+    
+    MPI_Group worldGroup, firstGroup, secondGroup;
+    
+    MPI_Comm_group(MPI_COMM_WORLD, &worldGroup); //get the group for the communicator WORLD
+    
+    MPI_Group_incl(worldGroup, np1, firstGroupArr, &firstGroup); //create the group firstGroup, using the processes in firstGroupArr, from worldGroup
+    MPI_Group_difference(worldGroup, firstGroup, &secondGroup); //create the group secondGroup, excluding firstGroup from worldGroup
+    
+    MPI_Comm firstComm, secondComm, myComm = NULL;
+    MPI_Comm_create(MPI_COMM_WORLD, firstGroup, &firstComm);
+    MPI_Comm_create(MPI_COMM_WORLD, secondGroup, &secondComm);
+    
+    for(int i=0; i<np1; i++) {
+        if(worldRank == firstGroupArr[i])
+            myComm = firstComm;
+    }
+    if(myComm == NULL)
+        myComm = secondComm;
+    
+    int groupRank, groupSize;
+    MPI_Comm_rank(myComm, &groupRank);
+    MPI_Comm_size(myComm, &groupSize);
+    
+//    for(int i=0; i<numOfProcesses; i++) {
+//        if(worldRank == i) {
+//            cout<<"Hello from "<<i<<" I am "<<groupRank<<" of "<<groupSize<<" in ";
+//            if(myComm == firstComm)
+//                cout<<"first";
+//            else
+//                cout<<"second";
+//            cout<<" comm"<<endl;
+//        }
+//
+//        MPI_Barrier(MPI_COMM_WORLD);
+//    }
+    
+    seed = 31415 * (worldRank+1); //I liked π
     
     int ** cells = nullptr;
     
-    if(rank==root) {
+    if(groupRank==root) {
         cells = matrixAllocation<int>(dim, dim);
         initModel(cells);
         
@@ -218,16 +298,16 @@ int main(int argc, char *argv[]) {
         drawCells(cells);
     }
     
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(myComm);
     
     int ** subMatrix1 = matrixAllocation<int>(dim/numOfProcesses, dim);
     int ** subMatrix2 = matrixAllocation<int>(dim/numOfProcesses, dim);
     
     //split the matrix into submatrices, one for each processor
-    if(rank==root)
-        MPI_Scatter(&cells[0][0], dim*dim/numOfProcesses, MPI_INT, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+    if(groupRank==root)
+        MPI_Scatter(&cells[0][0], dim*dim/numOfProcesses, MPI_INT, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
     else
-        MPI_Scatter(NULL, 0, NULL, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+        MPI_Scatter(NULL, 0, NULL, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
     
     
     int * upperVector = (int*) malloc(sizeof(int)*dim);
@@ -235,77 +315,81 @@ int main(int argc, char *argv[]) {
     
     bool whatMatrix = true; //true: compute subMatrix2 from subMatrix1, false: compute subMatrix1 from subMatrix2
     
-    while(continueProcessing(rank)) {
-            
-        if(rank==root) {
-
-            fillVector(upperVector, dim, 0); //upperVector for rank 0 is null, and also lowerVector for the highest rank
-            
-            if(numOfProcesses > 1)
-                copyVector(cells[(dim/numOfProcesses)], lowerVector, dim); //root's lowerVector is in that position of the matrix
-            else
-                copyVector(upperVector, lowerVector, dim); //root's lowerVector will be null
-            
-            MPI_Request r;
-                for(int j=1; j<numOfProcesses; j++) {
-                    
-                    //send the upper vector
-                    MPI_Isend(&cells[(j*dim/numOfProcesses) - 1][0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r);
-                    
-                    //send the lower vector
-                    if(j==numOfProcesses-1)
-                        MPI_Isend(&upperVector[0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r); //or null vector if it's the last processor
-                    else
-                        MPI_Isend(&cells[((j+1)*dim/numOfProcesses)][0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r);
-                }
-            
-        }
-        else {
-            
-            MPI_Status s;
-            //recieve upperVector and lowerVector
-            MPI_Recv(&upperVector[0], dim, MPI_INT, root, rank, MPI_COMM_WORLD, &s);
-            MPI_Recv(&lowerVector[0], dim, MPI_INT, root, rank, MPI_COMM_WORLD, &s);
-        }
-        
-        MPI_Barrier(MPI_COMM_WORLD);
+    while(continueProcessing(worldRank)) {
+        MPI_Request r;
+        MPI_Status s;
         
         if(whatMatrix) {
-            for(int i=0; i<dim/numOfProcesses; i++) {
+            
+            if(groupRank!=root) //send the lowerVector to the previous process
+                MPI_Isend(&subMatrix1[0][0], dim, MPI_INT, groupRank-1, 11, myComm, &r);
+            
+            if(groupRank!=groupSize-1) //recieve the lowerVector, or fill it with 0
+                MPI_Recv(&lowerVector[0], dim, MPI_INT, groupRank+1, 11, myComm, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
+            if(groupRank!=groupSize-1) //send the upperVector to the next process
+                MPI_Isend(&subMatrix1[dim/numOfProcesses - 1][0], dim, MPI_INT, groupRank+1, 44, myComm, &r);
+            
+            if(groupRank!=root) //recieve the upperVector, or fill it with 0
+                MPI_Recv(&upperVector[0], dim, MPI_INT, groupRank-1, 44, myComm, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
+            for(int i=0; i<dim/groupSize; i++) {
                 for(int j=0; j<dim; j++) {
                     //compute the new submatrix for each processor
                     subMatrix2[i][j] = computeTree(subMatrix1, i, j, upperVector, lowerVector);
                 }
             }
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(myComm);
             
             //the new matrix is stored into the root, overwriting the old one
-            if(rank==root)
-                MPI_Gather(&subMatrix2[0][0], dim*dim/numOfProcesses, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+            if(groupRank==root)
+                MPI_Gather(&subMatrix2[0][0], dim*dim/groupSize, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
             else
-                MPI_Gather(&subMatrix2[0][0], dim*dim/numOfProcesses, MPI_INT, NULL, 0, MPI_INT, root, MPI_COMM_WORLD);
+                MPI_Gather(&subMatrix2[0][0], dim*dim/groupSize, MPI_INT, NULL, 0, MPI_INT, root, myComm);
             
         }
         else {
-            for(int i=0; i<dim/numOfProcesses; i++) {
+            
+            if(groupRank!=root) //send the lowerVector to the previous process
+                MPI_Isend(&subMatrix2[0][0], dim, MPI_INT, groupRank-1, 22, myComm, &r);
+            
+            
+            if(groupRank!=groupSize-1) //recieve the lowerVector, or fill it with 0
+                MPI_Recv(&lowerVector[0], dim, MPI_INT, groupRank+1, 22, myComm, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
+            if(groupRank!=groupSize-1) //send the upperVector to the next process
+                MPI_Isend(&subMatrix2[dim/numOfProcesses - 1][0], dim, MPI_INT, groupRank+1, 33, myComm, &r);
+            
+            if(groupRank!=root) //recieve the upperVector, or fill it with 0
+                MPI_Recv(&upperVector[0], dim, MPI_INT, groupRank-1, 33, myComm, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
+            for(int i=0; i<dim/groupSize; i++) {
                 for(int j=0; j<dim; j++) {
                     //compute the new submatrix for each processor
                     subMatrix1[i][j] = computeTree(subMatrix2, i, j, upperVector, lowerVector);
                 }
             }
-            MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(myComm);
             
             //the new matrix is stored into the root, overwriting the old one
-            if(rank==root)
-                MPI_Gather(&subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+            if(groupRank==root)
+                MPI_Gather(&subMatrix1[0][0], dim*dim/groupSize, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
             else
-                MPI_Gather(&subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, NULL, 0, MPI_INT, root, MPI_COMM_WORLD);
+                MPI_Gather(&subMatrix1[0][0], dim*dim/groupSize, MPI_INT, NULL, 0, MPI_INT, root, myComm);
             
         }
         
         whatMatrix = !whatMatrix;
         
-        if(rank==root)
+        if(groupRank==root)
             drawCells(cells);
     
     }

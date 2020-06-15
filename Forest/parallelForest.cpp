@@ -191,7 +191,6 @@ int main(int argc, char *argv[]) {
     int rank;
     
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    
     MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
     
     if(dim%numOfProcesses!=0 && rank==root) {
@@ -239,9 +238,8 @@ int main(int argc, char *argv[]) {
         
         if(whatMatrix) {
             
-            if(rank!=0) //send the lowerVector to the previous process
+            if(rank!=root) //send the lowerVector to the previous process
                 MPI_Isend(&subMatrix1[0][0], dim, MPI_INT, rank-1, 11, MPI_COMM_WORLD, &r);
-            
             
             if(rank!=numOfProcesses-1) //recieve the lowerVector, or fill it with 0
                 MPI_Recv(&lowerVector[0], dim, MPI_INT, rank+1, 11, MPI_COMM_WORLD, &s);
@@ -251,7 +249,7 @@ int main(int argc, char *argv[]) {
             if(rank!=numOfProcesses-1) //send the upperVector to the next process
                 MPI_Isend(&subMatrix1[dim/numOfProcesses - 1][0], dim, MPI_INT, rank+1, 44, MPI_COMM_WORLD, &r);
             
-            if(rank!=0) //recieve the upperVector, or fill it with 0
+            if(rank!=root) //recieve the upperVector, or fill it with 0
                 MPI_Recv(&upperVector[0], dim, MPI_INT, rank-1, 44, MPI_COMM_WORLD, &s);
             else
                 fillVector(lowerVector, dim, 0);
@@ -273,9 +271,8 @@ int main(int argc, char *argv[]) {
         }
         else {
             
-            if(rank!=0) //send the lowerVector to the previous process
+            if(rank!=root) //send the lowerVector to the previous process
                 MPI_Isend(&subMatrix2[0][0], dim, MPI_INT, rank-1, 22, MPI_COMM_WORLD, &r);
-            
             
             if(rank!=numOfProcesses-1) //recieve the lowerVector, or fill it with 0
                 MPI_Recv(&lowerVector[0], dim, MPI_INT, rank+1, 22, MPI_COMM_WORLD, &s);
@@ -285,7 +282,7 @@ int main(int argc, char *argv[]) {
             if(rank!=numOfProcesses-1) //send the upperVector to the next process
                 MPI_Isend(&subMatrix2[dim/numOfProcesses - 1][0], dim, MPI_INT, rank+1, 33, MPI_COMM_WORLD, &r);
             
-            if(rank!=0) //recieve the upperVector, or fill it with 0
+            if(rank!=root) //recieve the upperVector, or fill it with 0
                 MPI_Recv(&upperVector[0], dim, MPI_INT, rank-1, 33, MPI_COMM_WORLD, &s);
             else
                 fillVector(lowerVector, dim, 0);
