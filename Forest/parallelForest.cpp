@@ -33,7 +33,7 @@ const int GROUND = 0;
 const int TREE = 1;
 const int BURNING = -1;
 //matrix dimension
-const int dim = 300;
+const int dim = 12;
 //lightining probability
 const int l = 2000;
 //growth probability
@@ -234,41 +234,28 @@ int main(int argc, char *argv[]) {
     bool whatMatrix = true; //true: compute subMatrix2 from subMatrix1, false: compute subMatrix1 from subMatrix2
     
     while(continueProcessing(rank)) {
-            
-        if(rank==root) {
-
-            fillVector(upperVector, dim, 0); //upperVector for rank 0 is null, and also lowerVector for the highest rank
-            
-            if(numOfProcesses > 1)
-                copyVector(cells[(dim/numOfProcesses)], lowerVector, dim); //root's lowerVector is in that position of the matrix
-            else
-                copyVector(upperVector, lowerVector, dim); //root's lowerVector will be null
-            
-            MPI_Request r;
-                for(int j=1; j<numOfProcesses; j++) {
-                    
-                    //send the upper vector
-                    MPI_Isend(&cells[(j*dim/numOfProcesses) - 1][0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r);
-                    
-                    //send the lower vector
-                    if(j==numOfProcesses-1)
-                        MPI_Isend(&upperVector[0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r); //or null vector if it's the last processor
-                    else
-                        MPI_Isend(&cells[((j+1)*dim/numOfProcesses)][0], dim, MPI_INT, j, j, MPI_COMM_WORLD, &r);
-                }
-            
-        }
-        else {
-            
-            MPI_Status s;
-            //recieve upperVector and lowerVector
-            MPI_Recv(&upperVector[0], dim, MPI_INT, root, rank, MPI_COMM_WORLD, &s);
-            MPI_Recv(&lowerVector[0], dim, MPI_INT, root, rank, MPI_COMM_WORLD, &s);
-        }
-        
-        MPI_Barrier(MPI_COMM_WORLD);
+        MPI_Request r;
+        MPI_Status s;
         
         if(whatMatrix) {
+            
+            if(rank!=0) //send the lowerVector to the previous process
+                MPI_Isend(&subMatrix1[0][0], dim, MPI_INT, rank-1, 11, MPI_COMM_WORLD, &r);
+            
+            
+            if(rank!=numOfProcesses-1) //recieve the lowerVector, or fill it with 0
+                MPI_Recv(&lowerVector[0], dim, MPI_INT, rank+1, 11, MPI_COMM_WORLD, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
+            if(rank!=numOfProcesses-1) //send the upperVector to the next process
+                MPI_Isend(&subMatrix1[dim/numOfProcesses - 1][0], dim, MPI_INT, rank+1, 44, MPI_COMM_WORLD, &r);
+            
+            if(rank!=0) //recieve the upperVector, or fill it with 0
+                MPI_Recv(&upperVector[0], dim, MPI_INT, rank-1, 44, MPI_COMM_WORLD, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
             for(int i=0; i<dim/numOfProcesses; i++) {
                 for(int j=0; j<dim; j++) {
                     //compute the new submatrix for each processor
@@ -285,6 +272,24 @@ int main(int argc, char *argv[]) {
             
         }
         else {
+            
+            if(rank!=0) //send the lowerVector to the previous process
+                MPI_Isend(&subMatrix2[0][0], dim, MPI_INT, rank-1, 22, MPI_COMM_WORLD, &r);
+            
+            
+            if(rank!=numOfProcesses-1) //recieve the lowerVector, or fill it with 0
+                MPI_Recv(&lowerVector[0], dim, MPI_INT, rank+1, 22, MPI_COMM_WORLD, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
+            if(rank!=numOfProcesses-1) //send the upperVector to the next process
+                MPI_Isend(&subMatrix2[dim/numOfProcesses - 1][0], dim, MPI_INT, rank+1, 33, MPI_COMM_WORLD, &r);
+            
+            if(rank!=0) //recieve the upperVector, or fill it with 0
+                MPI_Recv(&upperVector[0], dim, MPI_INT, rank-1, 33, MPI_COMM_WORLD, &s);
+            else
+                fillVector(lowerVector, dim, 0);
+            
             for(int i=0; i<dim/numOfProcesses; i++) {
                 for(int j=0; j<dim; j++) {
                     //compute the new submatrix for each processor

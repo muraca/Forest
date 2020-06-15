@@ -220,17 +220,24 @@ int main(int argc, char *argv[]) {
     
     MPI_Barrier(MPI_COMM_WORLD);
     
-    int ** subMatrix = matrixAllocation<int>(dim/numOfProcesses, dim);
-    int ** newSubMatrix = matrixAllocation<int>(dim/numOfProcesses, dim);
+    int ** subMatrix1 = matrixAllocation<int>(dim/numOfProcesses, dim);
+    int ** subMatrix2 = matrixAllocation<int>(dim/numOfProcesses, dim);
+    
+    //split the matrix into submatrices, one for each processor
+    if(rank==root)
+        MPI_Scatter(&cells[0][0], dim*dim/numOfProcesses, MPI_INT, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+    else
+        MPI_Scatter(NULL, 0, NULL, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+    
     
     int * upperVector = (int*) malloc(sizeof(int)*dim);
     int * lowerVector = (int*) malloc(sizeof(int)*dim);
     
+    bool whatMatrix = true; //true: compute subMatrix2 from subMatrix1, false: compute subMatrix1 from subMatrix2
+    
     while(continueProcessing(rank)) {
             
         if(rank==root) {
-            //split the matrix into submatrices, one for each processor
-            MPI_Scatter(&cells[0][0], dim*dim/numOfProcesses, MPI_INT, &subMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
 
             fillVector(upperVector, dim, 0); //upperVector for rank 0 is null, and also lowerVector for the highest rank
             
@@ -254,9 +261,7 @@ int main(int argc, char *argv[]) {
             
         }
         else {
-            //split the matrix into submatrices, one for each processor
-            MPI_Scatter(NULL, 0, NULL, &subMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
-
+            
             MPI_Status s;
             //recieve upperVector and lowerVector
             MPI_Recv(&upperVector[0], dim, MPI_INT, root, rank, MPI_COMM_WORLD, &s);
@@ -265,20 +270,40 @@ int main(int argc, char *argv[]) {
         
         MPI_Barrier(MPI_COMM_WORLD);
         
-        for(int i=0; i<dim/numOfProcesses; i++) {
-            for(int j=0; j<dim; j++) {
-                //compute the new submatrix for each processor
-                newSubMatrix[i][j] = computeTree(subMatrix, i, j, upperVector, lowerVector);
+        if(whatMatrix) {
+            for(int i=0; i<dim/numOfProcesses; i++) {
+                for(int j=0; j<dim; j++) {
+                    //compute the new submatrix for each processor
+                    subMatrix2[i][j] = computeTree(subMatrix1, i, j, upperVector, lowerVector);
+                }
             }
+            MPI_Barrier(MPI_COMM_WORLD);
+            
+            //the new matrix is stored into the root, overwriting the old one
+            if(rank==root)
+                MPI_Gather(&subMatrix2[0][0], dim*dim/numOfProcesses, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+            else
+                MPI_Gather(&subMatrix2[0][0], dim*dim/numOfProcesses, MPI_INT, NULL, 0, MPI_INT, root, MPI_COMM_WORLD);
+            
+        }
+        else {
+            for(int i=0; i<dim/numOfProcesses; i++) {
+                for(int j=0; j<dim; j++) {
+                    //compute the new submatrix for each processor
+                    subMatrix1[i][j] = computeTree(subMatrix2, i, j, upperVector, lowerVector);
+                }
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+            
+            //the new matrix is stored into the root, overwriting the old one
+            if(rank==root)
+                MPI_Gather(&subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
+            else
+                MPI_Gather(&subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, NULL, 0, MPI_INT, root, MPI_COMM_WORLD);
+            
         }
         
-        MPI_Barrier(MPI_COMM_WORLD);
-        
-        //the new matrix is stored into the root, overwriting the old one
-        if(rank==root)
-            MPI_Gather(&newSubMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
-        else
-            MPI_Gather(&newSubMatrix[0][0], dim*dim/numOfProcesses, MPI_INT, NULL, 0, MPI_INT, root, MPI_COMM_WORLD);
+        whatMatrix = !whatMatrix;
         
         if(rank==root)
             drawCells(cells);
@@ -286,8 +311,8 @@ int main(int argc, char *argv[]) {
     }
     
     deleteMatrix(cells);
-    deleteMatrix(subMatrix);
-    deleteMatrix(newSubMatrix);
+    deleteMatrix(subMatrix1);
+    deleteMatrix(subMatrix2);
     free(upperVector);
     free(lowerVector);
     
