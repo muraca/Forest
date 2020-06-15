@@ -300,14 +300,14 @@ int main(int argc, char *argv[]) {
     
     MPI_Barrier(myComm);
     
-    int ** subMatrix1 = matrixAllocation<int>(dim/numOfProcesses, dim);
-    int ** subMatrix2 = matrixAllocation<int>(dim/numOfProcesses, dim);
+    int ** subMatrix1 = matrixAllocation<int>(dim/groupSize, dim);
+    int ** subMatrix2 = matrixAllocation<int>(dim/groupSize, dim);
     
     //split the matrix into submatrices, one for each processor
     if(groupRank==root)
-        MPI_Scatter(&cells[0][0], dim*dim/numOfProcesses, MPI_INT, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
+        MPI_Scatter(&cells[0][0], dim*dim/groupSize, MPI_INT, &subMatrix1[0][0], dim*dim/groupSize, MPI_INT, root, myComm);
     else
-        MPI_Scatter(NULL, 0, NULL, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
+        MPI_Scatter(NULL, 0, NULL, &subMatrix1[0][0], dim*dim/groupSize, MPI_INT, root, myComm);
     
     
     int * upperVector = (int*) malloc(sizeof(int)*dim);
@@ -336,7 +336,7 @@ int main(int argc, char *argv[]) {
                 MPI_Recv(&upperVector[0], dim, MPI_INT, groupRank-1, 44, myComm, &s);
             else
                 fillVector(lowerVector, dim, 0);
-            
+
             for(int i=0; i<dim/groupSize; i++) {
                 for(int j=0; j<dim; j++) {
                     //compute the new submatrix for each processor
@@ -344,16 +344,16 @@ int main(int argc, char *argv[]) {
                 }
             }
             MPI_Barrier(myComm);
-            
+
             //the new matrix is stored into the root, overwriting the old one
             if(groupRank==root)
-                MPI_Gather(&subMatrix2[0][0], dim*dim/groupSize, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
+                MPI_Gather(&subMatrix2[0][0], dim*dim/groupSize, MPI_INT, &cells[0][0], dim*dim/groupSize, MPI_INT, root, myComm);
             else
                 MPI_Gather(&subMatrix2[0][0], dim*dim/groupSize, MPI_INT, NULL, 0, MPI_INT, root, myComm);
-            
+
         }
         else {
-            
+
             if(groupRank!=root) //send the lowerVector to the previous process
                 MPI_Isend(&subMatrix2[0][0], dim, MPI_INT, groupRank-1, 22, myComm, &r);
             
@@ -381,7 +381,7 @@ int main(int argc, char *argv[]) {
             
             //the new matrix is stored into the root, overwriting the old one
             if(groupRank==root)
-                MPI_Gather(&subMatrix1[0][0], dim*dim/groupSize, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, myComm);
+                MPI_Gather(&subMatrix1[0][0], dim*dim/groupSize, MPI_INT, &cells[0][0], dim*dim/groupSize, MPI_INT, root, myComm);
             else
                 MPI_Gather(&subMatrix1[0][0], dim*dim/groupSize, MPI_INT, NULL, 0, MPI_INT, root, myComm);
             
