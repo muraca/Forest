@@ -128,16 +128,16 @@ void drawCells(int ** cells) {
 
 
 //if you press esc, the game will finish
-bool continueProcessing(int groupRank, MPI_Comm myComm) {
+bool continueProcessing(int worldRank) {
     int buf = 0;
-    if(groupRank==root) {
+    if(worldRank==root) {
         ALLEGRO_KEYBOARD_STATE key_state;
         al_get_keyboard_state(&key_state);
         if(!al_key_down(&key_state, ALLEGRO_KEY_ESCAPE)) //root will check if the key esc is pressed
             buf = INT_MAX; //if so, this variable's value will become INT_MAX
     }
-    MPI_Barrier(myComm);
-    MPI_Bcast(&buf, 1, MPI_INT, root, myComm); //the variable will be broadcasted to all processors
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(&buf, 1, MPI_INT, root, MPI_COMM_WORLD); //the variable will be broadcasted to all processors
     return buf == INT_MAX; //if it's INT_MAX, the program will be stopped
 }
 
@@ -208,8 +208,11 @@ int main(int argc, char *argv[]) {
             cout<<"Error: please use a divider of "<< dim <<" as number of processes."<<endl;
             MPI_Abort(MPI_COMM_WORLD, -1);
         }
-        
-        firstGroupArr = new int[np1];
+    }
+    MPI_Bcast(&np1, 1, MPI_INT, root, MPI_COMM_WORLD); //broadcast to all the other processes the num of processes in the first group
+    firstGroupArr = new int[np1];
+    
+    if(worldRank == root) {
         for(int i=0; i<np1; i++) {
             cout<<"Insert process "<<i<<" for the first automata: ";
             int x;
@@ -233,11 +236,6 @@ int main(int argc, char *argv[]) {
             
         }
     }
-    
-    MPI_Bcast(&np1, 1, MPI_INT, root, MPI_COMM_WORLD); //broadcast to all the other processes the num of processes in the first group
-    
-    if(worldRank != root)
-        firstGroupArr = new int[np1];
     
     MPI_Bcast(&firstGroupArr[0], np1, MPI_INT, root, MPI_COMM_WORLD); //broadcast to all the other processes the array of processes in the first group
     
@@ -295,7 +293,7 @@ int main(int argc, char *argv[]) {
     
     bool whatMatrix = true; //true: compute subMatrix2 from subMatrix1, false: compute subMatrix1 from subMatrix2
     
-    while(continueProcessing(groupRank, myComm)) {
+    while(continueProcessing(worldRank)) {
         MPI_Request r;
         MPI_Status s;
         double start = MPI_Wtime();
@@ -333,7 +331,7 @@ int main(int argc, char *argv[]) {
 
         }
         else {
-
+            
             if(groupRank!=root) //send the lowerVector to the previous process
                 MPI_Isend(&subMatrix2[0][0], dim, MPI_INT, groupRank-1, 22, myComm, &r);
             

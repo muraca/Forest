@@ -18,4 +18,3 @@ for i in tests:
             entry[int(code)] = int(temp)
         roottime = entry[0]/1000000
         print("[{}] PROCESS TIME {}s".format(i,roottime))
-
