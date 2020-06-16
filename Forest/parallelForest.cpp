@@ -139,7 +139,7 @@ bool continueProcessing(int rank) {
             buf = INT_MAX; //if so, this variable's value will become INT_MAX
     }
     MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Bcast(&buf, 1, MPI_INT, 0, MPI_COMM_WORLD); //the variable will be broadcasted to all processors
+    MPI_Bcast(&buf, 1, MPI_INT, root, MPI_COMM_WORLD); //the variable will be broadcasted to all processors
     return buf == INT_MAX; //if it's INT_MAX, the program will be stopped
 }
 
@@ -206,7 +206,6 @@ int main(int argc, char *argv[]) {
     if(rank==root) {
         cells = matrixAllocation<int>(dim, dim);
         initModel(cells);
-        
         
         al_init();
         al_init_primitives_addon();

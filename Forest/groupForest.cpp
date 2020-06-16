@@ -134,16 +134,16 @@ void drawCells(int ** cells) {
 
 
 //if you press esc, the game will finish
-bool continueProcessing(int rank) {
+bool continueProcessing(int groupRank, MPI_Comm myComm) {
     int buf = 0;
-    if(rank==root) {
+    if(groupRank==root) {
         ALLEGRO_KEYBOARD_STATE key_state;
         al_get_keyboard_state(&key_state);
         if(!al_key_down(&key_state, ALLEGRO_KEY_ESCAPE)) //root will check if the key esc is pressed
             buf = INT_MAX; //if so, this variable's value will become INT_MAX
     }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Bcast(&buf, 1, MPI_INT, 0, MPI_COMM_WORLD); //the variable will be broadcasted to all processors
+    MPI_Barrier(myComm);
+    MPI_Bcast(&buf, 1, MPI_INT, root, myComm); //the variable will be broadcasted to all processors
     return buf == INT_MAX; //if it's INT_MAX, the program will be stopped
 }
 
@@ -269,19 +269,6 @@ int main(int argc, char *argv[]) {
     MPI_Comm_rank(myComm, &groupRank);
     MPI_Comm_size(myComm, &groupSize);
     
-//    for(int i=0; i<numOfProcesses; i++) {
-//        if(worldRank == i) {
-//            cout<<"Hello from "<<i<<" I am "<<groupRank<<" of "<<groupSize<<" in ";
-//            if(myComm == firstComm)
-//                cout<<"first";
-//            else
-//                cout<<"second";
-//            cout<<" comm"<<endl;
-//        }
-//
-//        MPI_Barrier(MPI_COMM_WORLD);
-//    }
-    
     seed = 31415 * (worldRank+1); //I liked π
     
     int ** cells = nullptr;
@@ -289,7 +276,6 @@ int main(int argc, char *argv[]) {
     if(groupRank==root) {
         cells = matrixAllocation<int>(dim, dim);
         initModel(cells);
-        
         
         al_init();
         al_init_primitives_addon();
@@ -315,10 +301,10 @@ int main(int argc, char *argv[]) {
     
     bool whatMatrix = true; //true: compute subMatrix2 from subMatrix1, false: compute subMatrix1 from subMatrix2
     
-    while(continueProcessing(worldRank)) {
+    while(continueProcessing(groupRank, myComm)) {
         MPI_Request r;
         MPI_Status s;
-        
+        double start = MPI_Wtime();
         if(whatMatrix) {
             
             if(groupRank!=root) //send the lowerVector to the previous process
@@ -388,6 +374,16 @@ int main(int argc, char *argv[]) {
         }
         
         whatMatrix = !whatMatrix;
+        double end = MPI_Wtime();
+        
+        MPI_Barrier(MPI_COMM_WORLD);
+        if(groupRank == root && myComm == firstComm)
+            cout<<"First automata took "<<end-start<<" seconds for computation."<<endl;
+        
+        MPI_Barrier(MPI_COMM_WORLD);
+        if(groupRank == root && myComm == secondComm)
+            cout<<"Second automata took "<<end-start<<" seconds for computation."<<endl;
+        
         
         if(groupRank==root)
             drawCells(cells);
