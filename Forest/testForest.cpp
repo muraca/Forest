@@ -6,6 +6,7 @@
 //  Copyright © 2020 Matteo Muraca. All rights reserved.
 //
 //  Parallel version of Forest - a green cellular automata
+//  Used for tests with test.py
 //  Programmed in C++ using MPI libraries
 //
 //  Forest rules:
@@ -23,8 +24,6 @@
 
 
 #include <iostream>
-#include <allegro5/allegro.h>
-#include <allegro5/allegro_primitives.h>
 #include <mpi.h>
 using namespace std;
 
@@ -33,18 +32,13 @@ const int GROUND = 0;
 const int TREE = 1;
 const int BURNING = -1;
 //matrix dimension
-const int dim = 200;
+int dim = 100;
 //lightining probability
 const int l = 2000;
 //growth probability
 const int g = 200;
 //seed for random
 unsigned int seed;
-
-//Allegro settings
-const int width = 1500;
-const int height = 1500;
-ALLEGRO_DISPLAY * display;
 
 //parallel processing variables
 const int root = 0;
@@ -83,58 +77,6 @@ void initModel(int** cells) {
             cells[i][j] = rand_r(&seed) % 2;
         }
     }
-}
-
-//draw the matrix
-void drawCells(int ** cells) {
-    al_clear_to_color(al_map_rgb(0,0,0));
-    
-    for (unsigned int i = 0; i < dim; i++) {
-        for (unsigned int j = 0; j < dim; j++) {
-            switch (cells[i][j]) {
-                case GROUND:
-                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
-                                             j * width/dim + width/dim,
-                                             i * height/dim + height/dim, al_map_rgb(73,32,0));
-                    break;
-                case TREE:
-                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
-                                             j * width/dim + width/dim,
-                                             i * height/dim + height/dim, al_map_rgb(0, 150, 0));
-                    
-                    break;
-                case BURNING:
-                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
-                                             j * width/dim + width/dim,
-                                             i * height/dim + height/dim, al_map_rgb(200, 0, 0));
-                    break;
-                default:
-                    al_draw_filled_rectangle(j * width/dim, i * width/dim,
-                                             j * width/dim + width/dim,
-                                             i * height/dim + height/dim, al_map_rgb(255, 255, 255));
-                    break;
-            }
-            
-        }
-        
-    }
-    al_flip_display();
-    al_rest(0.5);
-}
-
-
-//if you press esc, the game will finish
-bool continueProcessing(int rank) {
-    int buf = 0;
-    if(rank==root) {
-        ALLEGRO_KEYBOARD_STATE key_state;
-        al_get_keyboard_state(&key_state);
-        if(!al_key_down(&key_state, ALLEGRO_KEY_ESCAPE)) //root will check if the key esc is pressed
-            buf = INT_MAX; //if so, this variable's value will become INT_MAX
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
-    MPI_Bcast(&buf, 1, MPI_INT, root, MPI_COMM_WORLD); //the variable will be broadcasted to all processors
-    return buf == INT_MAX; //if it's INT_MAX, the program will be stopped
 }
 
 int computeTree(int ** subMatrix, int x, int y, int * upperVector, int * lowerVector) {
@@ -181,6 +123,8 @@ int computeTree(int ** subMatrix, int x, int y, int * upperVector, int * lowerVe
 
 int main(int argc, char *argv[]) {
     MPI_Init(&argc, &argv);
+    if(argc > 1)
+        dim = atoi(argv[1]);
     
     int rank;
     
@@ -188,7 +132,6 @@ int main(int argc, char *argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &numOfProcesses);
     
     if(dim%numOfProcesses!=0 && rank==root) {
-        cout<<"Error: please use a divider of "<< dim <<" as number of processes."<<endl;
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
     
@@ -196,36 +139,30 @@ int main(int argc, char *argv[]) {
     seed = 31415 * (rank+1); //I liked π
     
     int ** cells = nullptr;
-    
+        
     if(rank==root) {
         cells = matrixAllocation<int>(dim, dim);
         initModel(cells);
-        
-        al_init();
-        al_init_primitives_addon();
-        display = al_create_display(width, height);
-        al_install_keyboard();
-        drawCells(cells);
     }
-    
+        
     MPI_Barrier(MPI_COMM_WORLD);
-    
+        
     int ** subMatrix1 = matrixAllocation<int>(dim/numOfProcesses, dim);
     int ** subMatrix2 = matrixAllocation<int>(dim/numOfProcesses, dim);
-    
+        
     //split the matrix into submatrices, one for each processor
     if(rank==root)
         MPI_Scatter(&cells[0][0], dim*dim/numOfProcesses, MPI_INT, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
     else
         MPI_Scatter(NULL, 0, NULL, &subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
-    
-    
+        
+        
     int * upperVector = (int*) malloc(sizeof(int)*dim);
     int * lowerVector = (int*) malloc(sizeof(int)*dim);
-    
+        
     bool whatMatrix = true; //true: compute subMatrix2 from subMatrix1, false: compute subMatrix1 from subMatrix2
-    
-    while(continueProcessing(rank)) {
+        
+    for(int repetition = 0; repetition < 1000; repetition++){
         MPI_Request r;
         MPI_Status s;
         
@@ -266,7 +203,7 @@ int main(int argc, char *argv[]) {
             
             if(rank!=root) //send the lowerVector to the previous process
                 MPI_Isend(&subMatrix2[0][0], dim, MPI_INT, rank-1, 22, MPI_COMM_WORLD, &r);
-            
+                
             if(rank!=numOfProcesses-1) //recieve the lowerVector, or fill it with 0
                 MPI_Recv(&lowerVector[0], dim, MPI_INT, rank+1, 22, MPI_COMM_WORLD, &s);
             else
@@ -293,21 +230,20 @@ int main(int argc, char *argv[]) {
                 MPI_Gather(&subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, &cells[0][0], dim*dim/numOfProcesses, MPI_INT, root, MPI_COMM_WORLD);
             else
                 MPI_Gather(&subMatrix1[0][0], dim*dim/numOfProcesses, MPI_INT, NULL, 0, MPI_INT, root, MPI_COMM_WORLD);
-            
+                
         }
         
         whatMatrix = !whatMatrix;
-        
-        if(rank==root)
-            drawCells(cells);
-    
     }
-    
+        
+        
+        
     deleteMatrix(cells);
     deleteMatrix(subMatrix1);
     deleteMatrix(subMatrix2);
     free(upperVector);
     free(lowerVector);
+        
     
     MPI_Finalize();
     return 0;

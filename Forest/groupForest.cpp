@@ -60,12 +60,6 @@ void fillVector(int* vector, int dimension, int value) {
         vector[i] = value;
 }
 
-//copy one vector into another
-void copyVector(int* original, int* copy, int dimension) {
-    for(int i=0; i<dimension; i++)
-        copy[i] = original[i];
-}
-
 //2d array (matrix) contiguous allocation
 template <class T>
 T** matrixAllocation(int N, int M) {

@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		100C0AF62493C6950028FC29 /* serialForest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 100C0AF52493C6950028FC29 /* serialForest.cpp */; };
+		101398932498B46D00F50314 /* testForest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 101398922498B46D00F50314 /* testForest.cpp */; };
 		10D724152494C21D000407EC /* groupForest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 10D724142494C21D000407EC /* groupForest.cpp */; };
 		10D724172494C28E000407EC /* parallelForest.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 10D724162494C28E000407EC /* parallelForest.cpp */; };
 /* End PBXBuildFile section */
@@ -26,6 +27,10 @@
 
 /* Begin PBXFileReference section */
 		100C0AF52493C6950028FC29 /* serialForest.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = serialForest.cpp; sourceTree = "<group>"; };
+		1013988F2498A9AC00F50314 /* test.sh */ = {isa = PBXFileReference; lastKnownFileType = text.script.sh; path = test.sh; sourceTree = "<group>"; };
+		101398902498A9AC00F50314 /* hostfile */ = {isa = PBXFileReference; lastKnownFileType = text; path = hostfile; sourceTree = "<group>"; };
+		101398912498A9AC00F50314 /* test.py */ = {isa = PBXFileReference; lastKnownFileType = text.script.python; path = test.py; sourceTree = "<group>"; };
+		101398922498B46D00F50314 /* testForest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = testForest.cpp; sourceTree = "<group>"; };
 		1066F91324791F330076BAC6 /* Forest */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Forest; sourceTree = BUILT_PRODUCTS_DIR; };
 		10D724142494C21D000407EC /* groupForest.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = groupForest.cpp; sourceTree = "<group>"; };
 		10D724162494C28E000407EC /* parallelForest.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = parallelForest.cpp; sourceTree = "<group>"; };
@@ -68,6 +73,10 @@
 				10D724142494C21D000407EC /* groupForest.cpp */,
 				100C0AF52493C6950028FC29 /* serialForest.cpp */,
 				10D724162494C28E000407EC /* parallelForest.cpp */,
+				101398922498B46D00F50314 /* testForest.cpp */,
+				101398902498A9AC00F50314 /* hostfile */,
+				101398912498A9AC00F50314 /* test.py */,
+				1013988F2498A9AC00F50314 /* test.sh */,
 			);
 			path = Forest;
 			sourceTree = "<group>";
@@ -130,6 +139,7 @@
 			files = (
 				10D724172494C28E000407EC /* parallelForest.cpp in Sources */,
 				100C0AF62493C6950028FC29 /* serialForest.cpp in Sources */,
+				101398932498B46D00F50314 /* testForest.cpp in Sources */,
 				10D724152494C21D000407EC /* groupForest.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
