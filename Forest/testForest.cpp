@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
     int * lowerVector = (int*) malloc(sizeof(int)*dim);
         
     bool whatMatrix = true; //true: compute subMatrix2 from subMatrix1, false: compute subMatrix1 from subMatrix2
-        
+    double start = MPI_Wtime();
     for(int repetition = 0; repetition < 1000; repetition++){
         MPI_Request r;
         MPI_Status s;
@@ -235,7 +235,9 @@ int main(int argc, char *argv[]) {
         
         whatMatrix = !whatMatrix;
     }
-        
+    double end = MPI_Wtime();
+    
+    cout<<end-start;
         
         
     deleteMatrix(cells);
