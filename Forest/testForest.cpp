@@ -21,6 +21,11 @@
 // -1. Burning tree
 //
 //  You should use a divider of dim as number of processes.
+//  How to use:
+//  Simply run test.py and see the results.
+//  The program gets dim as arg input, but default value is 100 if you forget.
+//  Be careful to edit MPIRUN in test.sh, according to your device.
+//  You can also execute this code without test.py, you'll get the timings in output.
 
 
 #include <iostream>
