@@ -193,7 +193,7 @@ int main(int argc, char *argv[]) {
     }
     
     
-    seed = 31415 * (rank+1); //I liked π
+    seed = 31415 * (rank+1); //every process will have a different seed
     
     int ** cells = nullptr;
     

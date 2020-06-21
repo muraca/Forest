@@ -36,7 +36,7 @@ const int l = 2000;
 //growth probability
 const int g = 200;
 //seed for random
-unsigned int seed;
+unsigned int seed = 31415; //I liked π
 
 //Allegro settings
 const int width = 1500;
@@ -147,20 +147,17 @@ int computeTree(int ** cells, int x, int y) {
 
 int main(int argc, char *argv[]) {
     
-    
-    ALLEGRO_KEYBOARD_STATE key_state;
-    seed = 31415; //I liked π
-    
     int ** cells1 = matrixAllocation<int>(dim, dim);
     int ** cells2 = matrixAllocation<int>(dim, dim);
     initModel(cells1);
-        
+    
     al_init();
     al_init_primitives_addon();
     display = al_create_display(width, height);
     al_install_keyboard();
     drawCells(cells1);
-   
+    
+    ALLEGRO_KEYBOARD_STATE key_state;
     al_get_keyboard_state(&key_state);
     
     bool whatMatrix = true; //true: compute cells2 from cells1, false: compute cells1 from cells2
