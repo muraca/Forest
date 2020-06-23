@@ -2,7 +2,7 @@ from subprocess import Popen,PIPE
 import re
 import time
 
-tests = [1,2,4]
+tests = [2,4]
 dimensions = [100, 500, 1000, 2500]
 for i in tests:
     print("[+]TESTING with {} processes".format(i))
